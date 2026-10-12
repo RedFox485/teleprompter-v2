@@ -853,13 +853,17 @@ class TeleprompterApp(App):
     }
     #search-container {
         width: 80%;
-        height: 80%;
+        max-height: 80%;
         border: solid $primary;
         padding: 1;
     }
+    #search-container ListView {
+        max-height: 70%;
+        overflow-y: auto;
+    }
     #settings-container {
         width: 80%;
-        height: 80%;
+        max-height: 80%;
         padding: 1;
         overflow-y: auto;
         background: $surface;
@@ -877,6 +881,10 @@ class TeleprompterApp(App):
     }
     TabbedContent {
         height: 1fr;
+    }
+    TabPane {
+        height: 1fr;
+        overflow-y: auto;
     }
     """
 
