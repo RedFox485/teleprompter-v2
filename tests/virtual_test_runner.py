@@ -3,8 +3,12 @@ Comprehensive virtual tests for teleprompter-v2 using Textual's run_test.
 Tests rendering, edge cases, and functionality.
 """
 import asyncio
+import os
 from pathlib import Path
 import tempfile
+
+# Disable web server during tests
+os.environ["TELEPROMPTER_TEST"] = "1"
 
 from textual.app import App
 from teleprompter.app import TeleprompterApp

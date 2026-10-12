@@ -111,6 +111,10 @@ class AppConfig:
     fullscreen: bool = True
     stay_on_top: bool = True
 
+    # Web server
+    web_enabled: bool = True
+    web_port: int = 8000
+
     @classmethod
     def load(cls, path: Path) -> "AppConfig":
         if path.exists():

@@ -2,6 +2,7 @@
 Main Teleprompter Textual TUI Application.
 """
 import asyncio
+import os
 from pathlib import Path
 
 from textual.app import App, ComposeResult
@@ -32,6 +33,7 @@ from .models import (
     AppState,
     Setlist,
 )
+from .web_server import WebServer
 
 
 class ChordLine(Static):
@@ -359,6 +361,125 @@ class BPMWidget(Static):
             self.query_one("#tap-hint").update(msg)
 
 
+class WebView(Static):
+    """Web server status and QR code for iPhone connection."""
+    
+    DEFAULT_CSS = """
+    WebView {
+        width: 100%;
+        height: 1fr;
+        padding: 2;
+        background: $surface;
+        border: solid $primary;
+    }
+    WebView .web-title {
+        text-style: bold;
+        color: $accent;
+        margin-bottom: 1;
+    }
+    WebView .status-row {
+        height: 3;
+        margin-bottom: 1;
+    }
+    WebView .qr-container {
+        margin-top: 2;
+        align: center middle;
+    }
+    WebView .qr-line {
+        color: $text;
+    }
+    WebView .url {
+        color: $primary;
+        text-style: underline;
+    }
+    WebView .clients {
+        color: $success;
+        text-style: bold;
+    }
+    WebView .disabled {
+        color: $text-muted;
+        text-style: italic;
+    }
+    """
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.web_server = None
+        self.qr_lines = []
+        
+    def compose(self) -> ComposeResult:
+        yield Label("Web Server", classes="web-title")
+        yield Label("Status: Starting...", classes="status-row", id="web-status")
+        yield Label("", classes="status-row", id="web-url")
+        yield Label("", classes="status-row", id="web-clients")
+        yield Label("", classes="status-row", id="web-qr-title")
+        yield Static("", classes="qr-container", id="qr-code")
+        
+    def set_web_server(self, web_server: WebServer) -> None:
+        self.web_server = web_server
+        self._update_display()
+        
+    def _update_display(self) -> None:
+        if not self.web_server:
+            self.query_one("#web-status").update("Status: Not initialized")
+            return
+            
+        if self.web_server.runner is None:
+            self.query_one("#web-status").update("Status: Stopped")
+            self.query_one("#web-url").update("")
+            self.query_one("#web-clients").update("")
+            self.query_one("#web-qr-title").update("")
+            self.query_one("#qr-code").update("")
+            return
+            
+        info = self.web_server.get_connection_info()
+        self.query_one("#web-status").update("Status: Running")
+        self.query_one("#web-url").update(f"URL: [url]{info['url']}[/url]")
+        clients_label = self.query_one("#web-clients")
+        clients_label.update(f"Connected clients: {info['clients']}")
+        if info['clients'] > 0:
+            clients_label.add_class("clients")
+        else:
+            clients_label.remove_class("clients")
+        
+        # Generate QR code
+        self._generate_qr(info['url'])
+        
+    def _generate_qr(self, url: str) -> None:
+        """Generate ASCII QR code for the URL."""
+        try:
+            import qrcode
+            qr = qrcode.QRCode(version=1, box_size=1, border=1)
+            qr.add_data(url)
+            qr.make(fit=True)
+            matrix = qr.get_matrix()
+            
+            lines = []
+            for row in matrix:
+                line = ""
+                for cell in row:
+                    line += "██" if cell else "  "
+                lines.append(line)
+            
+            self.qr_lines = lines
+            self.query_one("#web-qr-title").update("Scan with iPhone camera:")
+            self.query_one("#qr-code").update("\n".join(lines))
+        except ImportError:
+            self.query_one("#web-qr-title").update("QR code unavailable (pip install qrcode)")
+            self.query_one("#qr-code").update("")
+
+    def update_clients(self, count: int) -> None:
+        if self.web_server:
+            info = self.web_server.get_connection_info()
+            clients_label = self.query_one("#web-clients")
+            clients_label.update(f"Connected clients: {count}")
+            if count > 0:
+                clients_label.add_class("clients")
+            else:
+                clients_label.remove_class("clients")
+            self.query_one("#web-url").update(f"URL: [url]{info['url']}[/url]")
+
+
 class SetlistView(ListView):
     """Setlist management view."""
     
@@ -571,9 +692,10 @@ class MainScreen(Screen):
     
     BINDINGS = [
         Binding("f1", "tab('tab-setlist')", "Setlist"),
-        Binding("f2", "tab('tab-lyrics')", "Lyrics"),
-        Binding("f3", "tab('tab-bpm')", "BPM"),
-        Binding("f4", "tab('tab-settings')", "Settings"),
+        Binding("f2", "action_tab_lyrics", "Lyrics"),
+        Binding("f3", "action_tab_bpm", "BPM"),
+        Binding("f4", "action_tab_settings", "Settings"),
+        Binding("f5", "action_tab_web", "Web"),
         Binding("ctrl+q", "quit", "Quit"),
         Binding("ctrl+s", "save_setlist", "Save"),
         Binding("ctrl+o", "load_setlist", "Load"),
@@ -581,6 +703,18 @@ class MainScreen(Screen):
         Binding("delete", "remove_song", "Remove"),
         Binding("space", "tap_tempo", "Tap Tempo"),
     ]
+
+    def action_tab_lyrics(self) -> None:
+        self.query_one("#main-tabs", TabbedContent).active = "tab-lyrics"
+
+    def action_tab_bpm(self) -> None:
+        self.query_one("#main-tabs", TabbedContent).active = "tab-bpm"
+
+    def action_tab_settings(self) -> None:
+        self.query_one("#main-tabs", TabbedContent).active = "tab-settings"
+
+    def action_tab_web(self) -> None:
+        self.query_one("#main-tabs", TabbedContent).active = "tab-web"
 
     def action_tap_tempo(self) -> None:
         """Handle Space key for tap tempo on BPM tab."""
@@ -603,6 +737,12 @@ class MainScreen(Screen):
             on_stop=self._on_midi_stop,
             midi_channel=self.app_state.config.midi_channel,
         )
+        self.web_server = WebServer(
+            self.app_state,
+            host="0.0.0.0",
+            port=self.app_state.config.web_port,
+            library=self.library,
+        ) if self.app_state.config.web_enabled else None
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -615,6 +755,8 @@ class MainScreen(Screen):
                 yield BPMWidget(id="bpm-widget")
             with TabPane("Settings (F4)", id="tab-settings"):
                 yield self._build_settings()
+            with TabPane("Web (F5)", id="tab-web"):
+                yield WebView(id="web-view")
         yield Footer()
 
     def _build_settings(self) -> Container:
@@ -723,6 +865,18 @@ class MainScreen(Screen):
                     placeholder="Setlists directory",
                     id="setlists-dir",
                 ),
+                Label("Web Server"),
+                Label("Enable web server:"),
+                Switch(
+                    value=config.web_enabled,
+                    id="web-enabled",
+                ),
+                Label("Web server port:"),
+                Input(
+                    value=str(config.web_port),
+                    placeholder="Web server port (e.g. 8000)",
+                    id="web-port",
+                ),
                 Button("Save Settings", id="save-settings", variant="success"),
             ),
             id="settings-container",
@@ -740,6 +894,12 @@ class MainScreen(Screen):
         if self.app_state.config.midi_input_port:
             self.midi_handler.open_port(self.app_state.config.midi_input_port)
             self.app_state.midi_connected = True
+        
+        # Start web server if enabled (skip in test environment)
+        if self.web_server and not os.environ.get("TELEPROMPTER_TEST"):
+            await self.web_server.start()
+            web_view = self.query_one("#web-view", WebView)
+            web_view.set_web_server(self.web_server)
         
         # Update views
         await self._refresh_setlist_view()
@@ -780,6 +940,7 @@ class MainScreen(Screen):
         # Also update lyrics view BPM
         lyrics = self.query_one("#lyrics-view", LyricsView)
         lyrics.set_bpm(int(bpm))
+        asyncio.create_task(self._broadcast_web_bpm())
 
     def _on_midi_start(self) -> None:
         lyrics = self.query_one("#lyrics-view", LyricsView)
@@ -789,6 +950,31 @@ class MainScreen(Screen):
     def _on_midi_stop(self) -> None:
         lyrics = self.query_one("#lyrics-view", LyricsView)
         lyrics.stop_auto_scroll()
+
+    async def on_unmount(self) -> None:
+        if self.web_server:
+            await self.web_server.stop()
+
+    async def _broadcast_web_state(self) -> None:
+        """Broadcast current state to all connected web clients."""
+        if self.web_server:
+            await self.web_server.broadcast_state()
+            web_view = self.query_one("#web-view", WebView)
+            web_view.update_clients(len(self.web_server.clients))
+
+    async def _broadcast_web_scroll(self, position: float) -> None:
+        if self.web_server:
+            await self.web_server.broadcast_scroll(position)
+
+    async def _broadcast_web_bpm(self) -> None:
+        if self.web_server:
+            await self.web_server.broadcast_bpm()
+
+    async def _broadcast_web_setlist(self) -> None:
+        if self.web_server:
+            await self.web_server.broadcast_setlist()
+            web_view = self.query_one("#web-view", WebView)
+            web_view.update_clients(len(self.web_server.clients))
 
     def action_tab(self, tab_id: str) -> None:
         tabs = self.query_one("#main-tabs", TabbedContent)
@@ -815,6 +1001,8 @@ class MainScreen(Screen):
             await self._refresh_setlist_view()
             self._refresh_lyrics_view()
             self._refresh_bpm_widget()
+            await self._broadcast_web_state()
+            await self._broadcast_web_setlist()
             self.app.notify(f"Added: {song.title}")
 
     async def action_remove_song(self) -> None:
@@ -831,6 +1019,7 @@ class MainScreen(Screen):
             current_setlist = self.app_state.current_setlist
             if current_setlist and current_setlist.remove_song(song_id):
                 await self._refresh_setlist_view()
+                await self._broadcast_web_setlist()
                 self.app.notify("Song removed")
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
@@ -850,6 +1039,8 @@ class MainScreen(Screen):
                         self._refresh_bpm_widget()
                         # Switch to lyrics tab
                         self.action_tab("tab-lyrics")
+                        # Broadcast to web clients
+                        asyncio.create_task(self._broadcast_web_state())
                         break
 
     def action_save_setlist(self) -> None:
@@ -867,6 +1058,8 @@ class MainScreen(Screen):
             await self._refresh_setlist_view()
             self._refresh_lyrics_view()
             self._refresh_bpm_widget()
+            await self._broadcast_web_state()
+            await self._broadcast_web_setlist()
             self.app.notify(f"Loaded: {loaded.name}")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -906,10 +1099,13 @@ class MainScreen(Screen):
         config.songs_dir = (self.query_one("#songs-dir", Input).value
                              or config.songs_dir)
         config.setlists_dir = (self.query_one("#setlists-dir", Input).value
-                                or config.setlists_dir)
+                                 or config.setlists_dir)
+        config.web_enabled = self.query_one("#web-enabled", Switch).value
+        port_val = self.query_one("#web-port", Input).value
+        config.web_port = int(port_val or config.web_port)
         
         config.save(Path(config.config_file))
-        self.app.notify("Settings saved")
+        self.app.notify("Settings saved (restart app to apply web server changes)")
 
     def _scan_midi_ports(self) -> None:
         ports = self.midi_handler.list_ports()

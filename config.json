@@ -20,5 +20,7 @@
   "setlists_dir": "setlists",
   "config_file": "config.json",
   "fullscreen": true,
-  "stay_on_top": true
+  "stay_on_top": true,
+  "web_enabled": true,
+  "web_port": 8000
 }
