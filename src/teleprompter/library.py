@@ -159,8 +159,19 @@ class SongLibrary:
                 if self._key_matches(entry.key, key_query)
             ][:max_results]
         
-        # Check for single key letter (e.g., "G", "Em", "C#m")
-        if self._is_simple_key_query(query):
+# Check for single key letter (e.g., "G", "Em", "C#m")
+        # Single letters A-G are treated as key searches ONLY if there are songs in that key
+        is_valid_key_letter = len(query) == 1 and query.upper() in "ABCDEFG"
+        if is_valid_key_letter:
+            # Only treat as key search if there are songs in that key
+            key_query = self._normalize_simple_key(query)
+            if any(self._key_matches(entry.key, key_query) for entry in self._cache.values()):
+                return [
+                    entry for entry in self._cache.values()
+                    if self._key_matches(entry.key, key_query)
+                ][:max_results]
+            # Fall through to title/artist search if no songs in that key
+        elif len(query) >= 2 and self._is_simple_key_query(query):
             key_query = self._normalize_simple_key(query)
             return [
                 entry for entry in self._cache.values()
@@ -209,10 +220,10 @@ class SongLibrary:
         - "eb major" -> "Eb"
         """
         query = query.strip()
-        # Pattern: <note><accidental>? (major|minor|ma|mi|min|majo|mino)
-        # Allow partial matches: major/ma/majo, minor/mi/min/mino
+        # Pattern: <note><accidental>? (major|minor|ma|mi|min|majo|mino|maj)
+        # Allow partial matches: major/ma/majo/maj, minor/mi/min/mino
         import re
-        pattern = r'^([A-Ga-g])([#b]?)\s*(major|minor|ma|mi|min|majo|mino)$'
+        pattern = r'^([A-Ga-g])([#b]?)\s*(major|minor|ma|mi|min|majo|mino|maj)$'
         match = re.match(pattern, query, re.IGNORECASE)
         if not match:
             return None
@@ -225,7 +236,7 @@ class SongLibrary:
         # Handle "mi" as minor explicitly
         if quality in ("mi", "min", "mino", "minor"):
             return f"{note}{accidental}m"
-        elif quality in ("ma", "majo", "major"):
+        elif quality in ("ma", "majo", "maj", "major"):
             return f"{note}{accidental}"
         elif quality.startswith("min"):
             return f"{note}{accidental}m"

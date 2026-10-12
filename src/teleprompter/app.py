@@ -17,7 +17,9 @@ from textual.widgets import (
     Label,
     ListItem,
     ListView,
+    Select,
     Static,
+    Switch,
     TabbedContent,
     TabPane,
 )
@@ -617,23 +619,75 @@ class MainScreen(Screen):
 
     def _build_settings(self) -> Container:
         config = self.app_state.config
+        
+        # Color options for Select widgets
+        color_options = [
+            ("White", "White"),
+            ("Black", "Black"),
+            ("Red", "Red"),
+            ("Green", "Green"),
+            ("Blue", "Blue"),
+            ("Yellow", "Yellow"),
+            ("Cyan", "Cyan"),
+            ("Magenta", "Magenta"),
+            ("Gray", "Gray"),
+            ("Bright White", "Bright White"),
+            ("Bright Red", "Bright Red"),
+            ("Bright Green", "Bright Green"),
+            ("Bright Blue", "Bright Blue"),
+            ("Bright Yellow", "Bright Yellow"),
+            ("Bright Cyan", "Bright Cyan"),
+            ("Bright Magenta", "Bright Magenta"),
+        ]
+        
+        # Map config color names to Select values (capitalized)
+        color_map = {
+            "white": "White", "black": "Black", "red": "Red", "green": "Green",
+            "blue": "Blue", "yellow": "Yellow", "cyan": "Cyan", "magenta": "Magenta",
+            "gray": "Gray", "bright_white": "Bright White", "bright_red": "Bright Red",
+            "bright_green": "Bright Green", "bright_blue": "Bright Blue",
+            "bright_yellow": "Bright Yellow", "bright_cyan": "Bright Cyan",
+            "bright_magenta": "Bright Magenta",
+        }
+        chord_color_val = color_map.get(config.chord_color, config.chord_color)
+        text_color_val = color_map.get(config.text_color, config.text_color)
+        bg_color_val = color_map.get(config.bg_color, config.bg_color)
+        
         return Container(
             Label("Settings", classes="screen-title"),
             Vertical(
                 Label("Display"),
-                Input(value=str(config.font_size), placeholder="Font size", id="font-size"),
-                Input(value=config.chord_color, placeholder="Chord color", id="chord-color"),
-                Input(value=config.text_color, placeholder="Text color", id="text-color"),
-                Input(value=config.bg_color, placeholder="Background color", id="bg-color"),
+                Input(value=str(config.font_size), placeholder="Font size (pt)", id="font-size"),
+                Label("Colors"),
+                Select(
+                    options=color_options,
+                    value=chord_color_val,
+                    id="chord-color",
+                    allow_blank=False,
+                    prompt="Chord color",
+                ),
+                Select(
+                    options=color_options,
+                    value=text_color_val,
+                    id="text-color",
+                    allow_blank=False,
+                    prompt="Text color",
+                ),
+                Select(
+                    options=color_options,
+                    value=bg_color_val,
+                    id="bg-color",
+                    allow_blank=False,
+                    prompt="Background color",
+                ),
                 Label("Auto-scroll"),
-                Input(
-                    value=str(config.auto_scroll_enabled),
-                    placeholder="Auto-scroll (true/false)",
+                Switch(
+                    value=config.auto_scroll_enabled,
                     id="auto-scroll",
                 ),
                 Input(
                     value=str(config.scroll_speed_factor),
-                    placeholder="Scroll speed factor",
+                    placeholder="Scroll speed factor (e.g. 0.5)",
                     id="scroll-speed",
                 ),
                 Label("MIDI"),
@@ -644,7 +698,7 @@ class MainScreen(Screen):
                 ),
                 Input(
                     value=str(config.midi_channel),
-                    placeholder="MIDI channel (0=omni)",
+                    placeholder="MIDI channel (0=omni, 1-16)",
                     id="midi-channel",
                 ),
                 Button("Scan MIDI Ports", id="scan-midi", variant="primary"),
@@ -813,19 +867,36 @@ class MainScreen(Screen):
 
     def _save_settings(self) -> None:
         config = self.app_state.config
-        config.font_size = int(self.query_one("#font-size").value or config.font_size)
-        config.chord_color = self.query_one("#chord-color").value or config.chord_color
-        config.text_color = self.query_one("#text-color").value or config.text_color
-        config.bg_color = self.query_one("#bg-color").value or config.bg_color
-        auto_scroll_val = self.query_one("#auto-scroll").value.lower()
-        config.auto_scroll_enabled = auto_scroll_val == "true"
-        speed_val = self.query_one("#scroll-speed").value
+        config.font_size = int(self.query_one("#font-size", Input).value or config.font_size)
+        
+        # Convert capitalized color names back to lowercase for config
+        color_reverse_map = {
+            "White": "white", "Black": "black", "Red": "red", "Green": "green",
+            "Blue": "blue", "Yellow": "yellow", "Cyan": "cyan", "Magenta": "magenta",
+            "Gray": "gray", "Bright White": "bright_white", "Bright Red": "bright_red",
+            "Bright Green": "bright_green", "Bright Blue": "bright_blue",
+            "Bright Yellow": "bright_yellow", "Bright Cyan": "bright_cyan",
+            "Bright Magenta": "bright_magenta",
+        }
+        
+        chord_sel = self.query_one("#chord-color", Select)
+        text_sel = self.query_one("#text-color", Select)
+        bg_sel = self.query_one("#bg-color", Select)
+        
+        config.chord_color = color_reverse_map.get(chord_sel.value, config.chord_color)
+        config.text_color = color_reverse_map.get(text_sel.value, config.text_color)
+        config.bg_color = color_reverse_map.get(bg_sel.value, config.bg_color)
+        config.auto_scroll_enabled = self.query_one("#auto-scroll", Switch).value
+        speed_val = self.query_one("#scroll-speed", Input).value
         config.scroll_speed_factor = float(speed_val or config.scroll_speed_factor)
-        config.midi_input_port = self.query_one("#midi-port").value or config.midi_input_port
-        channel_val = self.query_one("#midi-channel").value
-        config.midi_channel = int(channel_val or config.midi_channel)
-        config.songs_dir = self.query_one("#songs-dir").value or config.songs_dir
-        config.setlists_dir = self.query_one("#setlists-dir").value or config.setlists_dir
+        config.midi_input_port = (self.query_one("#midi-port", Input).value
+                                   or config.midi_input_port)
+        config.midi_channel = int(
+            self.query_one("#midi-channel", Input).value or config.midi_channel)
+        config.songs_dir = (self.query_one("#songs-dir", Input).value
+                             or config.songs_dir)
+        config.setlists_dir = (self.query_one("#setlists-dir", Input).value
+                                or config.setlists_dir)
         
         config.save(Path(config.config_file))
         self.app.notify("Settings saved")
