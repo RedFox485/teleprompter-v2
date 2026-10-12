@@ -81,6 +81,7 @@ footer .btn.stopped { border-color: var(--danger); color: var(--danger); backgro
   <button class="btn primary stopped" id="btnPlayPause">▶ Play</button>
   <button class="btn danger" id="btnStop">⏹ Stop</button>
   <button class="btn" id="btnNext">⏭</button>
+  <button class="btn" id="btnTap">TAP</button>
   <button class="btn" id="btnSearch">🔍</button>
   <button class="btn" id="btnTransposeDown">♭</button>
   <button class="btn" id="btnTransposeUp">♯</button>
@@ -338,6 +339,7 @@ footer .btn.stopped { border-color: var(--danger); color: var(--danger); backgro
     else send({type: "play"});
   };
   $("#btnStop").onclick = () => send({type: "stop"});
+  $("#btnTap").onclick = () => send({type: "tapTempo"});
   $("#btnPrev").onclick = () => send({type: "selectSong", index: Math.max(0, currentSongIndex - 1)});
   $("#btnNext").onclick = () => send({type: "selectSong", index: Math.min(currentSetlist.length - 1, currentSongIndex + 1)});
   $("#btnTransposeDown").onclick = () => send({type: "transpose", delta: -1});

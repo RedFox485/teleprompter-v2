@@ -135,7 +135,14 @@ class WebServer:
             if song_id:
                 song = self.app_state.library.get_song(song_id)
                 if song:
-                    self.app_state.current_setlist.add_song(song)
+                    self.app_state.current_setlist.add_song(
+                        song_path=song.filepath,
+                        song_title=song.title,
+                        song_artist=song.artist,
+                        song_key=song.key,
+                        song_tempo=song.tempo,
+                        song_time_signature=song.time_signature,
+                    )
                     await self.broadcast_setlist()
                     
         elif msg_type == "removeFromSetlist":
