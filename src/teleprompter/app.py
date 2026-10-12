@@ -657,8 +657,10 @@ class MainScreen(Screen):
             Label("Settings", classes="screen-title"),
             Vertical(
                 Label("Display"),
+                Label("Font size (pt):"),
                 Input(value=str(config.font_size), placeholder="Font size (pt)", id="font-size"),
                 Label("Colors"),
+                Label("Chord highlight color:"),
                 Select(
                     options=color_options,
                     value=chord_color_val,
@@ -666,6 +668,7 @@ class MainScreen(Screen):
                     allow_blank=False,
                     prompt="Chord color",
                 ),
+                Label("Lyrics text color:"),
                 Select(
                     options=color_options,
                     value=text_color_val,
@@ -673,6 +676,7 @@ class MainScreen(Screen):
                     allow_blank=False,
                     prompt="Text color",
                 ),
+                Label("Background color:"),
                 Select(
                     options=color_options,
                     value=bg_color_val,
@@ -681,21 +685,25 @@ class MainScreen(Screen):
                     prompt="Background color",
                 ),
                 Label("Auto-scroll"),
+                Label("Enable auto-scroll:"),
                 Switch(
                     value=config.auto_scroll_enabled,
                     id="auto-scroll",
                 ),
+                Label("Scroll speed factor (lines per beat):"),
                 Input(
                     value=str(config.scroll_speed_factor),
                     placeholder="Scroll speed factor (e.g. 0.5)",
                     id="scroll-speed",
                 ),
                 Label("MIDI"),
+                Label("MIDI input port name:"),
                 Input(
                     value=config.midi_input_port,
                     placeholder="MIDI input port name",
                     id="midi-port",
                 ),
+                Label("MIDI channel (0=omni, 1-16):"),
                 Input(
                     value=str(config.midi_channel),
                     placeholder="MIDI channel (0=omni, 1-16)",
@@ -703,11 +711,13 @@ class MainScreen(Screen):
                 ),
                 Button("Scan MIDI Ports", id="scan-midi", variant="primary"),
                 Label("Paths"),
+                Label("Songs directory:"),
                 Input(
                     value=config.songs_dir,
                     placeholder="Songs directory",
                     id="songs-dir",
                 ),
+                Label("Setlists directory:"),
                 Input(
                     value=config.setlists_dir,
                     placeholder="Setlists directory",
