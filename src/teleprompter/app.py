@@ -861,6 +861,13 @@ class TeleprompterApp(App):
         max-height: 70%;
         overflow-y: auto;
     }
+    #search-container ListView ListItem {
+        height: auto;
+        min-height: 3;
+    }
+    #search-container ListView ListItem > Horizontal {
+        height: auto;
+    }
     #settings-container {
         width: 80%;
         max-height: 80%;
