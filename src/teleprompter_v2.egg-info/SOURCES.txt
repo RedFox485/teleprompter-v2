@@ -1,0 +1,13 @@
+README.md
+pyproject.toml
+src/teleprompter/__init__.py
+src/teleprompter/app.py
+src/teleprompter/chordpro.py
+src/teleprompter/library.py
+src/teleprompter/midi_clock.py
+src/teleprompter/models.py
+src/teleprompter_v2.egg-info/PKG-INFO
+src/teleprompter_v2.egg-info/SOURCES.txt
+src/teleprompter_v2.egg-info/dependency_links.txt
+src/teleprompter_v2.egg-info/requires.txt
+src/teleprompter_v2.egg-info/top_level.txt

@@ -1,0 +1,206 @@
+Metadata-Version: 2.4
+Name: teleprompter-v2
+Version: 0.1.0
+Summary: Band/Live Karaoke Teleprompter - standalone lyrics & chords display with BPM sync
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: textual>=0.70.0
+Requires-Dist: python-rtmidi>=1.5.0
+Requires-Dist: pydantic>=2.8.0
+Requires-Dist: pyyaml>=6.0.1
+Requires-Dist: watchdog>=4.0.0
+Requires-Dist: rich>=13.7.0
+Provides-Extra: dev
+Requires-Dist: pytest>=8.2.0; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.23.0; extra == "dev"
+Requires-Dist: ruff>=0.6.0; extra == "dev"
+Requires-Dist: mypy>=1.10.0; extra == "dev"
+
+# Teleprompter V2
+
+Standalone band/live karaoke teleprompter with lyrics, chords, BPM sync, and MIDI clock input.
+
+## Features
+
+- **ChordPro format** (.cho/.pro) — industry standard, human-readable
+- **Large, high-contrast lyrics display** — dark mode default, chord highlighting
+- **BPM-synced auto-scroll** — configurable lines-per-beat
+- **Tap tempo** — SPACE to tap, calculates BPM
+- **Visual click flash** — screen flashes on downbeat
+- **MIDI clock input** — sync BPM from Akai Force, lightrig, or any MIDI clock source
+- **Section navigation** — jump between Verse/Chorus/Bridge
+- **Transpose** — shift chords up/down semitones ([ / ])
+- **Setlist management** — drag-reorder, request queue, song status
+- **Song library** — cached scanning, search by title/artist
+- **Cross-platform** — runs on Mac, Linux, Raspberry Pi 3B+
+
+## Quick Start
+
+```bash
+cd ~/Documents/projects/teleprompter-v2
+pip install -e .
+python run.py
+```
+
+## Controls
+
+| Key | Action |
+|-----|--------|
+| `F1` | Setlist tab |
+| `F2` | Lyrics tab |
+| `F3` | BPM tab |
+| `F4` | Settings tab |
+| `↑/↓` | Scroll lyrics |
+| `PgUp/PgDn` | Page scroll |
+| `Home/End` | Jump to top/bottom |
+| `SPACE` | Tap tempo (BPM tab) / Toggle auto-scroll (Lyrics tab) |
+| `t` | Toggle chord display |
+| `[` / `]` | Transpose down/up |
+| `a` | Add song to setlist |
+| `Delete` | Remove song from setlist |
+| `Enter` | Select song / Add from search |
+| `Escape` | Cancel search |
+| `Ctrl+S` | Save setlist |
+| `Ctrl+O` | Load setlist |
+| `Ctrl+Q` | Quit |
+
+## MIDI Clock Sync
+
+The app listens for MIDI Clock (0xF8) messages to auto-detect BPM and play/stop state.
+
+1. Connect your MIDI source (Akai Force USB, lightrig MIDI out, etc.)
+2. In Settings (F4), enter the MIDI port name (partial match works)
+3. Click "Scan MIDI Ports" to see available ports
+4. Save settings — MIDI sync activates automatically
+
+When MIDI clock is received:
+- BPM updates in real-time
+- Auto-scroll starts/stops with MIDI Start/Stop
+- Lyrics view follows the beat
+
+## Song Format (ChordPro)
+
+```chordpro
+{title: Song Title}
+{artist: Artist Name}
+{key: G}
+{tempo: 120}
+{time: 4/4}
+{capo: 2}
+
+{section: Verse 1}
+This is a [G]line with [C]inline [D]chords
+
+{section: Chorus}
+[G]Chord [C]on [D]its [G]own
+```
+
+### Supported Directives
+
+| Directive | Aliases | Description |
+|-----------|---------|-------------|
+| `title` | `t` | Song title |
+| `artist` | `a` | Artist name |
+| `key` | `k` | Musical key |
+| `tempo` | `bpm` | BPM |
+| `time` | `time_signature` | Time signature |
+| `capo` | | Capo fret |
+| `section` | `soc`, `chorus` | Section marker |
+| `end_of_section` | `eoc`, `eos` | End section |
+| `comment` | `c` | Comment line |
+
+## Project Structure
+
+```
+teleprompter-v2/
+├── run.py                 # Entry point
+├── pyproject.toml         # Dependencies
+├── config.json            # App config (auto-generated)
+├── songs/                 # ChordPro files (.cho/.pro)
+├── setlists/              # Saved setlists (.json)
+├── src/teleprompter/
+│   ├── __init__.py
+│   ├── app.py             # Main Textual TUI app
+│   ├── chordpro.py        # ChordPro parser/renderer
+│   ├── library.py         # Song library & setlist management
+│   ├── midi_clock.py      # MIDI clock input handler
+│   └── models.py          # Data models
+└── tests/                 # Unit tests
+```
+
+## Raspberry Pi 3B Deployment
+
+```bash
+# On Pi
+sudo apt update && sudo apt install python3.11 python3.11-venv libasound2-dev
+git clone <repo> teleprompter-v2
+cd teleprompter-v2
+python3.11 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+
+# Run
+python run.py
+
+# For kiosk mode (auto-start on boot):
+# Create systemd service or add to ~/.bashrc
+```
+
+## Configuration
+
+`config.json` (auto-generated on first run):
+
+```json
+{
+  "font_size": 28,
+  "line_spacing": 1.4,
+  "chord_color": "cyan",
+  "text_color": "white",
+  "bg_color": "black",
+  "highlight_color": "yellow",
+  "section_color": "magenta",
+  "auto_scroll_enabled": true,
+  "scroll_speed_factor": 0.5,
+  "scroll_smoothing": true,
+  "bpm": 120,
+  "time_signature": "4/4",
+  "visual_click": true,
+  "click_flash_duration_ms": 100,
+  "midi_input_port": "",
+  "midi_channel": 0,
+  "midi_sync_enabled": true,
+  "songs_dir": "songs",
+  "setlists_dir": "setlists",
+  "config_file": "config.json",
+  "fullscreen": true,
+  "stay_on_top": true
+}
+```
+
+## Development
+
+```bash
+# Install dev dependencies
+pip install -e ".[dev]"
+
+# Run tests
+pytest
+
+# Lint
+ruff check .
+
+# Type check
+mypy src/
+```
+
+## Integration with lightrig
+
+The teleprompter and lightrig can sync via MIDI clock:
+
+- **lightrig** sends MIDI clock (from Akai Force or internal) → virtual MIDI port
+- **teleprompter** receives on virtual MIDI port → auto BPM, auto-scroll sync
+- Both stay perfectly in time without network dependency
+
+## License
+
+MIT

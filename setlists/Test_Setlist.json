@@ -1,0 +1,30 @@
+{
+  "id": "60bac8dd-d95b-4a0b-a9af-1a2026c235ce",
+  "name": "Test Setlist",
+  "date": "2026-10-11",
+  "notes": "",
+  "songs": [
+    {
+      "id": "73ed8533-957e-4293-a171-92451e9947b2",
+      "song_path": "sweet_home_alabama.cho",
+      "title": "Sweet Home Alabama",
+      "artist": "Lynyrd Skynyrd",
+      "key": "G",
+      "tempo": 98,
+      "status": "rehearsed",
+      "transpose": 0,
+      "added_at": "2026-10-11T15:45:00.391202"
+    },
+    {
+      "id": "df59b647-6cd1-456e-a877-2d8d9792858c",
+      "song_path": "wonderwall.cho",
+      "title": "Wonderwall",
+      "artist": "Oasis",
+      "key": "Em",
+      "tempo": 87,
+      "status": "rehearsed",
+      "transpose": 0,
+      "added_at": "2026-10-11T15:45:00.391210"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+[
+  {
+    "filepath": "wonderwall.cho",
+    "hash": "e0c318c55486918b",
+    "title": "Wonderwall",
+    "artist": "Oasis",
+    "key": "Em",
+    "tempo": 87,
+    "time_signature": "4/4"
+  },
+  {
+    "filepath": "sweet_home_alabama.cho",
+    "hash": "364128518a2c4d07",
+    "title": "Sweet Home Alabama",
+    "artist": "Lynyrd Skynyrd",
+    "key": "G",
+    "tempo": 98,
+    "time_signature": "4/4"
+  },
+  {
+    "filepath": "free_bird.cho",
+    "hash": "0f48eaaf0d54afee",
+    "title": "Free Bird",
+    "artist": "Lynyrd Skynyrd",
+    "key": "G",
+    "tempo": 102,
+    "time_signature": "4/4"
+  }
+]
