@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from aiohttp import web
 
 from teleprompter.chordpro import Song
+from teleprompter.models import PlayState
 
 
 @dataclass
@@ -156,6 +157,18 @@ class WebServer:
             )
             await self.broadcast_state()
             
+        elif msg_type == "play":
+            self.app_state.play_state = PlayState.PLAYING
+            await self.broadcast_state()
+            
+        elif msg_type == "pause":
+            self.app_state.play_state = PlayState.PAUSED
+            await self.broadcast_state()
+            
+        elif msg_type == "stop":
+            self.app_state.play_state = PlayState.STOPPED
+            await self.broadcast_state()
+            
         elif msg_type == "ping":
             if client_id in self.clients:
                 self.clients[client_id].last_ping = time.time()
@@ -172,10 +185,11 @@ class WebServer:
         await ws.send_str(json.dumps({
             "type": "state",
             "song": self._song_to_dict(song) if song else None,
-            "scroll": 0.0,  # AppState doesn't track scroll position
+            "scroll": 0.0,
             "transpose": self.app_state.transpose,
             "bpm": self.app_state.bpm,
             "autoScroll": self.app_state.config.auto_scroll_enabled,
+            "playState": self.app_state.play_state.value,
             "setlist": self._setlist_to_list(),
             "currentSongIndex": self.app_state.current_song_index,
             "midiConnected": self.app_state.midi_connected,
@@ -226,6 +240,7 @@ class WebServer:
             "transpose": self.app_state.transpose,
             "bpm": self.app_state.bpm,
             "autoScroll": self.app_state.config.auto_scroll_enabled,
+            "playState": self.app_state.play_state.value,
             "setlist": self._setlist_to_list(),
             "currentSongIndex": self.app_state.current_song_index,
             "midiConnected": self.app_state.midi_connected,

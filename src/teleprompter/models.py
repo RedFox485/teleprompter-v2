@@ -15,6 +15,12 @@ class SongStatus(Enum):
     REQUEST = "request"
 
 
+class PlayState(Enum):
+    STOPPED = "stopped"    # Show not started or show over
+    PLAYING = "playing"    # Actively scrolling
+    PAUSED = "paused"      # Paused mid-song
+
+
 @dataclass
 class SetlistSong:
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
@@ -135,7 +141,7 @@ class AppState:
     current_song_index: int = -1
     current_line_index: int = 0
     current_section_index: int = 0
-    is_playing: bool = False
+    play_state: PlayState = PlayState.STOPPED
     is_fullscreen: bool = True
     show_chords: bool = True
     transpose: int = 0

@@ -31,6 +31,7 @@ from .midi_clock import MidiClockHandler
 from .models import (
     AppConfig,
     AppState,
+    PlayState,
     Setlist,
 )
 from .web_server import WebServer
@@ -116,7 +117,8 @@ class LyricsView(VerticalScroll):
         Binding("pagedown", "page_down", "Page down"),
         Binding("home", "scroll_home", "Top"),
         Binding("end", "scroll_end", "Bottom"),
-        Binding("space", "toggle_auto_scroll", "Auto-scroll"),
+        Binding("space", "play_pause", "Play/Pause"),
+        Binding("s", "stop", "Stop"),
         Binding("t", "toggle_chords", "Chords"),
         Binding("]", "transpose_up", "Transpose +"),
         Binding("[", "transpose_down", "Transpose -"),
@@ -190,6 +192,38 @@ class LyricsView(VerticalScroll):
                 widget._render_line()
         self.app.notify(f"Chords: {'ON' if self.show_chords else 'OFF'}")
 
+    def action_play_pause(self) -> None:
+        """Play or pause the teleprompter."""
+        if not self.song:
+            self.app.notify("No song loaded")
+            return
+            
+        app_state = self.app.app_state
+        if app_state.play_state == PlayState.PLAYING:
+            app_state.play_state = PlayState.PAUSED
+            self.stop_auto_scroll()
+            self.app.notify("Paused")
+        else:
+            app_state.play_state = PlayState.PLAYING
+            if self.current_line >= len(self._line_widgets) - 1:
+                self.current_line = 0
+                self._highlight_current_line()
+                self.scroll_home()
+            self.start_auto_scroll()
+            self.app.notify("Playing")
+        asyncio.create_task(self.app.screen._broadcast_web_state())
+
+    def action_stop(self) -> None:
+        """Stop the teleprompter - reset to beginning."""
+        app_state = self.app.app_state
+        app_state.play_state = PlayState.STOPPED
+        self.stop_auto_scroll()
+        self.current_line = 0
+        self._highlight_current_line()
+        self.scroll_home()
+        self.app.notify("Stopped")
+        asyncio.create_task(self.app.screen._broadcast_web_state())
+
     def action_transpose_up(self) -> None:
         self.transpose += 1
         self._apply_transpose()
@@ -208,12 +242,14 @@ class LyricsView(VerticalScroll):
 
     def set_bpm(self, bpm: int) -> None:
         self.bpm = bpm
-        if self.auto_scroll and self.scroll_task:
+        app_state = self.app.app_state
+        if app_state.play_state == PlayState.PLAYING and self.scroll_task:
             self.scroll_task.cancel()
             self.scroll_task = asyncio.create_task(self._auto_scroll_loop())
 
     def start_auto_scroll(self) -> None:
-        if self.auto_scroll and not self.scroll_task:
+        app_state = self.app.app_state
+        if app_state.play_state == PlayState.PLAYING and not self.scroll_task:
             self.scroll_task = asyncio.create_task(self._auto_scroll_loop())
 
     def stop_auto_scroll(self) -> None:
@@ -223,8 +259,9 @@ class LyricsView(VerticalScroll):
 
     async def _auto_scroll_loop(self) -> None:
         """Auto-scroll based on BPM."""
+        app_state = self.app.app_state
         try:
-            while self.auto_scroll and self.song:
+            while (app_state.play_state == PlayState.PLAYING and self.song):
                 # Calculate delay: lines per beat = scroll_speed_factor
                 # beats per second = bpm / 60
                 # lines per second = (bpm / 60) * lines_per_beat
@@ -233,7 +270,7 @@ class LyricsView(VerticalScroll):
                 delay = 1.0 / lines_per_second if lines_per_second > 0 else 1.0
 
                 await asyncio.sleep(delay)
-                if self.auto_scroll:
+                if app_state.play_state == PlayState.PLAYING:
                     self.current_line = min(self.current_line + 1, len(self._line_widgets) - 1)
                     self._highlight_current_line()
                     # Smooth scroll to keep current line visible
@@ -408,12 +445,15 @@ class WebView(Static):
         self.qr_lines = []
         
     def compose(self) -> ComposeResult:
-        yield Label("Web Server", classes="web-title")
-        yield Label("Status: Starting...", classes="status-row", id="web-status")
-        yield Label("", classes="status-row", id="web-url")
-        yield Label("", classes="status-row", id="web-clients")
-        yield Label("", classes="status-row", id="web-qr-title")
-        yield Static("", classes="qr-container", id="qr-code")
+        yield VerticalScroll(
+            Label("Web Server", classes="web-title"),
+            Label("Status: Starting...", classes="status-row", id="web-status"),
+            Label("", classes="status-row", id="web-url"),
+            Label("", classes="status-row", id="web-clients"),
+            Label("", classes="status-row", id="web-qr-title"),
+            Static("", classes="qr-container", id="qr-code"),
+            id="web-scroll"
+        )
         
     def set_web_server(self, web_server: WebServer) -> None:
         self.web_server = web_server

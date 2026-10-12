@@ -41,6 +41,9 @@ main { flex: 1; overflow-y: auto; padding: 12px; padding-bottom: 100px; }
 .flash-overlay.active { opacity: 0.3; transition: opacity 50ms; }
 footer { position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg); border-top: 1px solid var(--border); padding: 8px 12px; display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
 footer .btn { flex: 1; max-width: 140px; text-align: center; }
+footer .btn.playing { border-color: var(--accent); color: var(--accent); background: rgba(0,255,136,0.1); }
+footer .btn.paused { border-color: var(--warning); color: var(--warning); background: rgba(255,200,0,0.1); }
+footer .btn.stopped { border-color: var(--danger); color: var(--danger); background: rgba(255,68,68,0.1); }
 #searchPanel { position: fixed; bottom: 60px; left: 12px; right: 12px; background: var(--card); border: 1px solid var(--border); border-radius: 12px 12px 0 0; padding: 12px; transform: translateY(100%); transition: transform 0.2s; z-index: 50; max-height: 60vh; overflow-y: auto; }
 #searchPanel.open { transform: translateY(0); }
 #searchInput { width: 100%; padding: 12px; font-size: 18px; border: 1px solid var(--border); background: var(--bg); color: var(--fg); border-radius: 8px; margin-bottom: 8px; }
@@ -75,7 +78,8 @@ footer .btn { flex: 1; max-width: 140px; text-align: center; }
 <div class="flash-overlay" id="flash"></div>
 <footer>
   <button class="btn" id="btnPrev">⏮</button>
-  <button class="btn primary" id="btnTap">TAP</button>
+  <button class="btn primary stopped" id="btnPlayPause">▶ Play</button>
+  <button class="btn danger" id="btnStop">⏹ Stop</button>
   <button class="btn" id="btnNext">⏭</button>
   <button class="btn" id="btnSearch">🔍</button>
   <button class="btn" id="btnTransposeDown">♭</button>
@@ -104,6 +108,7 @@ footer .btn { flex: 1; max-width: 140px; text-align: center; }
   let currentTranspose = 0;
   let currentBpm = 0;
   let midiConnected = false;
+  let playState = "stopped"; // stopped, playing, paused
   let isSearchOpen = false;
   let isSetlistOpen = false;
   let lyricsScrollRaf = null;
@@ -147,7 +152,7 @@ footer .btn { flex: 1; max-width: 140px; text-align: center; }
   }
   
   function applyState(msg) {
-    const wasPlaying = currentBpm > 0;
+    const wasPlaying = playState === "playing";
     currentSong = msg.song;
     currentSetlist = msg.setlist || [];
     currentSongIndex = msg.currentSongIndex ?? 0;
@@ -155,14 +160,17 @@ footer .btn { flex: 1; max-width: 140px; text-align: center; }
     currentTranspose = msg.transpose ?? 0;
     currentBpm = msg.bpm ?? 0;
     midiConnected = msg.midiConnected ?? false;
+    playState = msg.playState ?? "stopped";
     serverTimeOffset = (msg.serverTime || 0) - performance.now() / 1000;
     
     if (msg.scroll !== undefined) setScrollPosition(msg.scroll);
     renderSong();
     renderSetlist();
     updateTitle();
+    updatePlayButton();
     
-    if (currentBpm > 0 && !wasPlaying) scheduleBeats();
+    if (playState === "playing" && !wasPlaying) scheduleBeats();
+    else if (playState !== "playing") clearTimeout(nextBeatTimeout);
   }
   
   function applyBpm(msg) {
@@ -304,8 +312,32 @@ footer .btn { flex: 1; max-width: 140px; text-align: center; }
   
   function escapeHtml(s) { return String(s).replace(/&/g,"&").replace(/</g,"<").replace(/>/g,">").replace(/"/g,"""); }
   
+  function updatePlayButton() {
+    const btn = $("#btnPlayPause");
+    const stopBtn = $("#btnStop");
+    btn.classList.remove("playing", "paused", "stopped");
+    stopBtn.classList.remove("playing", "paused", "stopped");
+    if (playState === "playing") {
+      btn.textContent = "⏸ Pause";
+      btn.classList.add("playing");
+      stopBtn.classList.add("playing");
+    } else if (playState === "paused") {
+      btn.textContent = "▶ Resume";
+      btn.classList.add("paused");
+      stopBtn.classList.add("paused");
+    } else {
+      btn.textContent = "▶ Play";
+      btn.classList.add("stopped");
+      stopBtn.classList.add("stopped");
+    }
+  }
+  
   // UI handlers
-  $("#btnTap").onclick = () => send({type: "tapTempo"});
+  $("#btnPlayPause").onclick = () => {
+    if (playState === "playing") send({type: "pause"});
+    else send({type: "play"});
+  };
+  $("#btnStop").onclick = () => send({type: "stop"});
   $("#btnPrev").onclick = () => send({type: "selectSong", index: Math.max(0, currentSongIndex - 1)});
   $("#btnNext").onclick = () => send({type: "selectSong", index: Math.min(currentSetlist.length - 1, currentSongIndex + 1)});
   $("#btnTransposeDown").onclick = () => send({type: "transpose", delta: -1});
