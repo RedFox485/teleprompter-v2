@@ -108,8 +108,30 @@ class LyricsView(VerticalScroll):
     LyricsView ChordLine.active {
         background: $warning 30%;
     }
+    LyricsView .controls {
+        height: 3;
+        dock: bottom;
+        background: $panel;
+        border-top: solid $primary;
+        padding: 0 1;
+    }
+    LyricsView .controls Button {
+        margin: 0 1;
+    }
+    LyricsView .controls .playing {
+        background: $success 30%;
+        border: solid $success;
+    }
+    LyricsView .controls .paused {
+        background: $warning 30%;
+        border: solid $warning;
+    }
+    LyricsView .controls .stopped {
+        background: $error 30%;
+        border: solid $error;
+    }
     """
-
+    
     BINDINGS = [
         Binding("up", "scroll_up", "Scroll up"),
         Binding("down", "scroll_down", "Scroll down"),
@@ -135,6 +157,16 @@ class LyricsView(VerticalScroll):
         self.lines_per_beat = 0.5
         self.bpm = 120
         self._line_widgets: list[ChordLine] = []
+
+    def compose(self) -> ComposeResult:
+        yield Container(id="lyrics-container")
+        yield Horizontal(
+            Button("▶ Play", id="btn-play", variant="success", classes="playing"),
+            Button("⏸ Pause", id="btn-pause", variant="warning", classes="paused"),
+            Button("⏹ Stop", id="btn-stop", variant="error", classes="stopped"),
+            Label("", id="play-status"),
+            classes="controls"
+        )
 
     def set_song(self, song: Song) -> None:
         self.song = song
@@ -222,7 +254,43 @@ class LyricsView(VerticalScroll):
         self._highlight_current_line()
         self.scroll_home()
         self.app.notify("Stopped")
+        self._update_play_buttons()
         asyncio.create_task(self.app.screen._broadcast_web_state())
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "btn-play" or event.button.id == "btn-pause":
+            self.action_play_pause()
+        elif event.button.id == "btn-stop":
+            self.action_stop()
+
+    def _update_play_buttons(self) -> None:
+        app_state = self.app.app_state
+        play_btn = self.query_one("#btn-play", Button)
+        pause_btn = self.query_one("#btn-pause", Button)
+        stop_btn = self.query_one("#btn-stop", Button)
+        status_label = self.query_one("#play-status", Label)
+        
+        if app_state.play_state == PlayState.PLAYING:
+            play_btn.display = False
+            pause_btn.display = True
+            stop_btn.display = True
+            status_label.update("▶ PLAYING")
+            status_label.styles.color = "green"
+        elif app_state.play_state == PlayState.PAUSED:
+            play_btn.display = True
+            pause_btn.display = False
+            stop_btn.display = True
+            status_label.update("⏸ PAUSED")
+            status_label.styles.color = "yellow"
+        else:
+            play_btn.display = True
+            pause_btn.display = False
+            stop_btn.display = False
+            status_label.update("⏹ STOPPED")
+            status_label.styles.color = "red"
+
+    def on_mount(self) -> None:
+        self._update_play_buttons()
 
     def action_transpose_up(self) -> None:
         self.transpose += 1
