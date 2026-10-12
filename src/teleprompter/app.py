@@ -472,6 +472,9 @@ class SongSearchScreen(Screen):
 
     def on_mount(self) -> None:
         self.query_one("#search-input").focus()
+        # Populate initial search results (all songs)
+        self.search_results = self.library.get_all_entries()
+        self._update_results_list()
         # Auto-select first item when results list gets focus
         # Use a timer to wait for composition to complete
         def set_initial_focus():
@@ -479,6 +482,27 @@ class SongSearchScreen(Screen):
             if results_list.index is None and len(results_list.children) > 0:
                 results_list.index = 0
         self.set_timer(0.01, set_initial_focus)
+
+    def _update_results_list(self) -> None:
+        """Update the results list with current search_results."""
+        results_list = self.query_one("#results-list", ListView)
+        # Clear existing items
+        for child in list(results_list.children):
+            child.remove()
+        for _idx, entry in enumerate(self.search_results):
+            self._search_counter += 1
+            base_id = entry.filepath.replace(".", "_").replace("/", "_")
+            safe_id = f"{base_id}_{self._search_counter}"
+            meta = f"{entry.artist}  •  {entry.key}  •  {entry.tempo} BPM"
+            item = ListItem(
+                Horizontal(
+                    Label(entry.title, classes="song-title"),
+                    Label(meta, classes="song-meta"),
+                ),
+                id=safe_id,
+            )
+            item.original_filepath = entry.filepath
+            results_list.append(item)
 
     def on_key(self, event: Key) -> None:
         """Handle key events at screen level for focus management."""
@@ -498,27 +522,7 @@ class SongSearchScreen(Screen):
                 self.search_results = self.library.search(query)
             else:
                 self.search_results = self.library.get_all_entries()
-            
-            results_list = self.query_one("#results-list", ListView)
-            # Clear existing items by removing them from the DOM
-            for child in list(results_list.children):
-                child.remove()
-            for _idx, entry in enumerate(self.search_results):
-                # Sanitize ID for Textual (no dots allowed) + add counter
-                self._search_counter += 1
-                base_id = entry.filepath.replace(".", "_").replace("/", "_")
-                safe_id = f"{base_id}_{self._search_counter}"
-                meta = f"{entry.artist}  •  {entry.key}  •  {entry.tempo} BPM"
-                item = ListItem(
-                    Horizontal(
-                        Label(entry.title, classes="song-title"),
-                        Label(meta, classes="song-meta"),
-                    ),
-                    id=safe_id,
-                )
-                # Store original filepath for lookup
-                item.original_filepath = entry.filepath
-                results_list.append(item)
+            self._update_results_list()
 
     async def on_list_view_selected(self, event: ListView.Selected) -> None:
         if self.on_select:
@@ -573,7 +577,15 @@ class MainScreen(Screen):
         Binding("ctrl+o", "load_setlist", "Load"),
         Binding("a", "add_song", "Add Song"),
         Binding("delete", "remove_song", "Remove"),
+        Binding("space", "tap_tempo", "Tap Tempo"),
     ]
+
+    def action_tap_tempo(self) -> None:
+        """Handle Space key for tap tempo on BPM tab."""
+        tabs = self.query_one("#main-tabs", TabbedContent)
+        if tabs.active == "tab-bpm":
+            bpm = self.query_one("#bpm-widget", BPMWidget)
+            bpm.tap()
 
     def __init__(self, app_state: AppState, **kwargs):
         super().__init__(**kwargs)
@@ -734,7 +746,11 @@ class MainScreen(Screen):
                 song_tempo=song.tempo,
                 song_time_signature=song.time_signature,
             )
+            # Select the newly added song
+            self.app_state.current_song_index = len(self.app_state.current_setlist.songs) - 1
             await self._refresh_setlist_view()
+            self._refresh_lyrics_view()
+            self._refresh_bpm_widget()
             self.app.notify(f"Added: {song.title}")
 
     async def action_remove_song(self) -> None:
