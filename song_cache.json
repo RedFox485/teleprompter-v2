@@ -6,7 +6,10 @@
     "artist": "Oasis",
     "key": "Em",
     "tempo": 87,
-    "time_signature": "4/4"
+    "time_signature": "4/4",
+    "capo": 0,
+    "duration_seconds": 0.0,
+    "tags": []
   },
   {
     "filepath": "sweet_home_alabama.cho",
@@ -15,7 +18,10 @@
     "artist": "Lynyrd Skynyrd",
     "key": "G",
     "tempo": 98,
-    "time_signature": "4/4"
+    "time_signature": "4/4",
+    "capo": 0,
+    "duration_seconds": 0.0,
+    "tags": []
   },
   {
     "filepath": "free_bird.cho",
@@ -24,6 +30,9 @@
     "artist": "Lynyrd Skynyrd",
     "key": "G",
     "tempo": 102,
-    "time_signature": "4/4"
+    "time_signature": "4/4",
+    "capo": 0,
+    "duration_seconds": 0.0,
+    "tags": []
   }
 ]

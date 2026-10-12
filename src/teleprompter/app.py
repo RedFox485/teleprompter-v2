@@ -472,8 +472,8 @@ class SongSearchScreen(Screen):
 
     def on_mount(self) -> None:
         self.query_one("#search-input").focus()
-        # Populate initial search results (all songs)
-        self.search_results = self.library.get_all_entries()
+        # Populate initial search results (up to 8 songs)
+        self.search_results = self.library.get_all_entries()[:8]
         self._update_results_list()
         # Auto-select first item when results list gets focus
         # Use a timer to wait for composition to complete
@@ -519,9 +519,9 @@ class SongSearchScreen(Screen):
         if event.input.id == "search-input":
             query = event.value.strip()
             if query:
-                self.search_results = self.library.search(query)
+                self.search_results = self.library.search(query, max_results=8)
             else:
-                self.search_results = self.library.get_all_entries()
+                self.search_results = self.library.get_all_entries()[:8]
             self._update_results_list()
 
     async def on_list_view_selected(self, event: ListView.Selected) -> None:

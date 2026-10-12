@@ -19,6 +19,14 @@ class SongCacheEntry:
     key: str
     tempo: int
     time_signature: str
+    # Enhanced metadata for future use
+    capo: int = 0
+    duration_seconds: float = 0.0
+    tags: list[str] = None
+    
+    def __post_init__(self):
+        if self.tags is None:
+            self.tags = []
 
 
 class SongLibrary:
@@ -81,6 +89,7 @@ class SongLibrary:
                             key=song.key or "",
                             tempo=song.tempo,
                             time_signature=song.time_signature,
+                            capo=song.capo,
                         )
                         self._cache[rel_path] = entry
                         entries.append(entry)
@@ -110,13 +119,160 @@ class SongLibrary:
         """Get all cached song entries."""
         return list(self._cache.values())
 
-    def search(self, query: str) -> list[SongCacheEntry]:
-        """Search songs by title/artist."""
-        query = query.lower()
+    def search(self, query: str, max_results: int = 8) -> list[SongCacheEntry]:
+        """Search songs by title, artist, key, or tempo.
+        
+        Supports:
+        - Title/artist: "sweet", "lynard"
+        - Key search: "G major", "g ma", "A minor", "a min", "a mi", "G", "Em"
+        - Tempo: "98", "87", "120bpm", "90-110"
+        """
+        query = query.strip().lower()
+        if not query:
+            return list(self._cache.values())[:max_results]
+        
+        # Check for BPM range query (e.g., "120bpm", "100-140")
+        if query.endswith("bpm") or ("-" in query and not query.startswith("-")):
+            try:
+                if query.endswith("bpm"):
+                    target_bpm = int(query[:-3])
+                    return [
+                        e for e in self._cache.values()
+                        if abs(e.tempo - target_bpm) <= 5
+                    ][:max_results]
+                elif "-" in query:
+                    parts = query.split("-")
+                    min_bpm = int(parts[0])
+                    max_bpm = int(parts[1])
+                    return [
+                        e for e in self._cache.values()
+                        if min_bpm <= e.tempo <= max_bpm
+                    ][:max_results]
+            except ValueError:
+                pass
+        
+        # Check for key search (e.g., "G major", "g ma", "A minor", "a min", "G", "Em")
+        key_query = self._parse_key_query(query)
+        if key_query:
+            return [
+                entry for entry in self._cache.values()
+                if self._key_matches(entry.key, key_query)
+            ][:max_results]
+        
+        # Check for single key letter (e.g., "G", "Em", "C#m")
+        if self._is_simple_key_query(query):
+            key_query = self._normalize_simple_key(query)
+            return [
+                entry for entry in self._cache.values()
+                if self._key_matches(entry.key, key_query)
+            ][:max_results]
+        
+        # Check for tempo number (e.g., "98", "87", "120")
+        if query.isdigit():
+            target_tempo = int(query)
+            return [
+                e for e in self._cache.values()
+                if abs(e.tempo - target_tempo) <= 2
+            ][:max_results]
+        
+        # Default: search title and artist
         return [
             entry for entry in self._cache.values()
             if query in entry.title.lower() or query in entry.artist.lower()
-        ]
+        ][:max_results]
+
+    def _is_simple_key_query(self, query: str) -> bool:
+        """Check if query is a simple key like 'G', 'Em', 'C#m'."""
+        import re
+        return bool(re.match(r'^[a-gA-G][#b]?m?$', query))
+
+    def _normalize_simple_key(self, query: str) -> str:
+        """Normalize simple key query like 'g' -> 'G', 'em' -> 'Em'."""
+        query = query.strip()
+        import re
+        match = re.match(r'^([a-gA-G])([#b]?)(m?)$', query)
+        if not match:
+            return query
+        note, accidental, minor = match.groups()
+        return f"{note.upper()}{accidental}{minor}"
+
+    def _parse_key_query(self, query: str) -> str | None:
+        """Parse key search query. Returns normalized key or None.
+        
+        Matches:
+        - "G major" -> "G"
+        - "g ma" -> "G"
+        - "A minor" -> "Am"
+        - "a min" -> "Am"
+        - "a mi" -> "Am"
+        - "c# minor" -> "C#m"
+        - "eb major" -> "Eb"
+        """
+        query = query.strip()
+        # Pattern: <note><accidental>? (major|minor|ma|mi|min|majo|mino)
+        # Allow partial matches: major/ma/majo, minor/mi/min/mino
+        import re
+        pattern = r'^([A-Ga-g])([#b]?)\s*(major|minor|ma|mi|min|majo|mino)$'
+        match = re.match(pattern, query, re.IGNORECASE)
+        if not match:
+            return None
+        
+        note, accidental, quality = match.groups()
+        note = note.upper()
+        quality = quality.lower()
+        
+        # Normalize key
+        # Handle "mi" as minor explicitly
+        if quality in ("mi", "min", "mino", "minor"):
+            return f"{note}{accidental}m"
+        elif quality in ("ma", "majo", "major"):
+            return f"{note}{accidental}"
+        elif quality.startswith("min"):
+            return f"{note}{accidental}m"
+        else:
+            return f"{note}{accidental}"
+
+    def _key_matches(self, song_key: str, query_key: str) -> bool:
+        """Check if song key matches query key (handles enharmonic equivalents)."""
+        if not song_key:
+            return False
+        
+        # Normalize both keys for comparison
+        song_norm = self._normalize_key(song_key)
+        query_norm = self._normalize_key(query_key)
+        
+        return song_norm == query_norm
+
+    def _normalize_key(self, key: str) -> str:
+        """Normalize key for comparison (handles enharmonic equivalents)."""
+        # Remove any quality suffix, normalize accidentals
+        import re
+        match = re.match(r'^([A-G])([#b]?)(m)?', key)
+        if not match:
+            return key
+        note, accidental, minor = match.groups()
+        accidental = accidental or ""
+        minor = minor or ""
+        
+        # Enharmonic equivalents
+        enharmonic = {
+            ("C#", ""): ("Db", ""),
+            ("Db", ""): ("C#", ""),
+            ("D#", ""): ("Eb", ""),
+            ("Eb", ""): ("D#", ""),
+            ("F#", ""): ("Gb", ""),
+            ("Gb", ""): ("F#", ""),
+            ("G#", ""): ("Ab", ""),
+            ("Ab", ""): ("G#", ""),
+            ("A#", ""): ("Bb", ""),
+            ("Bb", ""): ("A#", ""),
+        }
+        
+        key_base = f"{note}{accidental}{minor}"
+        equiv = enharmonic.get((note, accidental))
+        if equiv:
+            return f"{equiv[0]}{equiv[1]}{minor}"
+        return key_base
 
 
 class SetlistManager:
