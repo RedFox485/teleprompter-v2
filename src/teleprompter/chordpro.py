@@ -31,21 +31,25 @@ class Chord:
     quality: str = ""
     bass: str | None = None
     raw: str = ""
+    beat: int | None = None  # Beat number within measure (1-based), e.g., [C@2]
 
     @classmethod
     def parse(cls, text: str) -> "Chord":
         text = text.strip()
         # Match: [C], [Cm], [Cmaj7], [C/G], [C/E], etc.
+        # Extended: [C@2], [Cm@1], [G@4] for beat-relative positioning
         pattern = (
             r"^([A-G][#b]?)"
             r"(m|maj7|min7|m7b5|dim7|dim|aug|sus2|sus4|7|add9|6|9)?"
-            r"(?:/([A-G][#b]?))?$"
+            r"(?:/([A-G][#b]?))?"
+            r"(?:@(\d+))?$"
         )
         match = re.match(pattern, text)
         if not match:
             return cls(root="", raw=text)
-        root, quality, bass = match.groups()
-        return cls(root=root, quality=quality or "", bass=bass, raw=text)
+        root, quality, bass, beat_str = match.groups()
+        beat = int(beat_str) if beat_str else None
+        return cls(root=root, quality=quality or "", bass=bass, raw=text, beat=beat)
 
     def transpose(self, semitones: int) -> "Chord":
         notes = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
@@ -58,11 +62,12 @@ class Chord:
             except ValueError:
                 return self
         new_root = notes[(idx + semitones) % 12]
-        return Chord(root=new_root, quality=self.quality, bass=self.bass)
+        return Chord(root=new_root, quality=self.quality, bass=self.bass, beat=self.beat)
 
     def __str__(self) -> str:
         bass = f"/{self.bass}" if self.bass else ""
-        return f"[{self.root}{self.quality}{bass}]"
+        beat = f"@{self.beat}" if self.beat else ""
+        return f"[{self.root}{self.quality}{bass}{beat}]"
 
 
 @dataclass

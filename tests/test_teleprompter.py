@@ -47,6 +47,37 @@ class TestChord:
         transposed = chord.transpose(2)
         assert transposed.root == "C"
 
+    def test_parse_beat_annotation(self):
+        chord = Chord.parse("C@2")
+        assert chord.root == "C"
+        assert chord.beat == 2
+
+    def test_parse_minor_with_beat(self):
+        chord = Chord.parse("Am@1")
+        assert chord.root == "A"
+        assert chord.quality == "m"
+        assert chord.beat == 1
+
+    def test_parse_slash_with_beat(self):
+        chord = Chord.parse("C/E@3")
+        assert chord.root == "C"
+        assert chord.bass == "E"
+        assert chord.beat == 3
+
+    def test_transpose_preserves_beat(self):
+        chord = Chord.parse("C@2")
+        transposed = chord.transpose(2)
+        assert transposed.root == "D"
+        assert transposed.beat == 2
+
+    def test_str_includes_beat(self):
+        chord = Chord.parse("C@2")
+        assert str(chord) == "[C@2]"
+
+    def test_str_includes_slash_and_beat(self):
+        chord = Chord.parse("C/E@3")
+        assert str(chord) == "[C/E@3]"
+
 
 class TestChordProParser:
     def test_parse_basic(self):

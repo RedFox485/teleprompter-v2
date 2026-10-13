@@ -62,6 +62,18 @@ footer .btn.stopped { border-color: var(--danger); color: var(--danger); backgro
 .setlist-item .title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .setlist-item .meta { font-size: 12px; color: var(--muted); display: flex; gap: 8px; }
 .setlist-item .actions { display: flex; gap: 4px; }
+.live-panel { position: fixed; bottom: 60px; left: 12px; right: 12px; background: var(--card); border: 1px solid var(--border); border-radius: 12px 12px 0 0; padding: 12px; transform: translateY(100%); transition: transform 0.2s; z-index: 50; max-height: 60vh; overflow-y: auto; }
+.live-panel.open { transform: translateY(0); }
+.live-panel h3 { margin-bottom: 10px; color: var(--accent); font-size: 14px; }
+.live-section { display: flex; align-items: center; gap: 8px; padding: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; }
+.live-section.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.live-section .name { flex: 1; font-weight: 600; }
+.live-section .progress { width: 60px; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.live-section .progress-bar { height: 100%; background: var(--accent); transition: width 0.1s; }
+.live-section .actions { display: flex; gap: 4px; }
+.live-section .action-btn { padding: 4px 8px; font-size: 11px; }
+.live-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.live-actions .btn { flex: 1; min-width: 80px; font-size: 12px; padding: 8px 6px; }
 @media (max-width: 480px) { .lyrics { font-size: 18px; } footer .btn { max-width: none; flex: 1; } }
 </style>
 </head>
@@ -85,12 +97,14 @@ footer .btn.stopped { border-color: var(--danger); color: var(--danger); backgro
   <button class="btn" id="btnSearch">🔍</button>
   <button class="btn" id="btnTransposeDown">♭</button>
   <button class="btn" id="btnTransposeUp">♯</button>
+  <button class="btn" id="btnLive">🎵 Live</button>
 </footer>
 <div id="searchPanel">
   <input type="search" id="searchInput" placeholder="Search: G, Em, 120bpm, 90-110, artist, title…" autocapitalize="off" autocorrect="off" spellcheck="false">
   <div class="search-results" id="searchResults"></div>
 </div>
 <div class="setlist-panel" id="setlistPanel"></div>
+<div class="live-panel" id="livePanel"></div>
 <script>
 (function() {
   const WS_URL = `ws://${location.host}/ws`;
@@ -112,6 +126,8 @@ footer .btn.stopped { border-color: var(--danger); color: var(--danger); backgro
   let playState = "stopped"; // stopped, playing, paused
   let isSearchOpen = false;
   let isSetlistOpen = false;
+  let isLiveOpen = false;
+  let liveStatus = null;
   let lyricsScrollRaf = null;
   let lastScrollPosition = 0;
   
@@ -148,6 +164,7 @@ footer .btn.stopped { border-color: var(--danger); color: var(--danger); backgro
       case "bpm": applyBpm(msg); break;
       case "setlist": currentSetlist = msg.setlist; renderSetlist(); break;
       case "searchResults": renderSearchResults(msg.results); break;
+      case "liveStatus": liveStatus = msg; renderLivePanel(); break;
       case "pong": serverTimeOffset = msg.serverTime - performance.now() / 1000; break;
     }
   }
@@ -333,6 +350,50 @@ footer .btn.stopped { border-color: var(--danger); color: var(--danger); backgro
     }
   }
   
+  function renderLivePanel() {
+    if (!liveStatus) return;
+    const panel = $("#livePanel");
+    let html = `<h3>${liveStatus.title} - ${liveStatus.artist} (${liveStatus.tempo} BPM)</h3>`;
+    html += '<div class="live-sections">';
+    liveStatus.sections.forEach((s, i) => {
+      const isActive = i === liveStatus.current_section_index;
+      html += `
+        <div class="live-section ${isActive ? 'active' : ''}" style="border-left: 4px solid ${s.color}">
+          <span class="name">${s.name} ${s.is_extended ? '⟳' : ''} ${s.repeats > 1 ? `×${s.repeats}` : ''}</span>
+          <div class="progress"><div class="progress-bar" style="width: ${Math.round(s.section_progress * 100)}%"></div></div>
+          <div class="actions">
+            ${s.repeats < s.max_repeats ? `<button class="btn action-btn" data-action="extend" data-index="${i}">+1</button>` : ''}
+            ${i > liveStatus.current_section_index ? `<button class="btn action-btn" data-action="skip" data-index="${i}">→</button>` : ''}
+          </div>
+        </div>
+      `;
+    });
+    html += '</div>';
+    html += '<div class="live-actions">';
+    html += '<button class="btn" data-action="add_chorus">+ Chorus</button>';
+    html += '<button class="btn" data-action="add_verse">+ Verse</button>';
+    html += '<button class="btn" data-action="add_bridge">+ Bridge</button>';
+    html += '<button class="btn" data-action="add_solo">+ Solo</button>';
+    html += '<button class="btn danger" data-action="end_song">End Song</button>';
+    html += '</div>';
+    panel.innerHTML = html;
+    
+    // Attach action handlers
+    panel.querySelectorAll('[data-action]').forEach(btn => {
+      btn.onclick = () => {
+        const action = btn.dataset.action;
+        const index = parseInt(btn.dataset.index || -1);
+        sendLiveAction(action, index);
+      };
+    });
+  }
+  
+  function sendLiveAction(action, index = -1) {
+    send({type: "liveAction", action: action, index: index});
+    // Refresh status after action
+    setTimeout(() => send({type: "getLiveStatus"}), 100);
+  }
+  
   // UI handlers
   $("#btnPlayPause").onclick = () => {
     if (playState === "playing") send({type: "pause"});
@@ -346,6 +407,15 @@ footer .btn.stopped { border-color: var(--danger); color: var(--danger); backgro
   $("#btnTransposeUp").onclick = () => send({type: "transpose", delta: 1});
   $("#btnSearch").onclick = toggleSearch;
   $("#btnSetlist").onclick = toggleSetlist;
+  $("#btnLive").onclick = toggleLive;
+  
+  function toggleLive() {
+    isLiveOpen = !isLiveOpen;
+    $("#livePanel").classList.toggle("open", isLiveOpen);
+    if (isLiveOpen) {
+      send({type: "getLiveStatus"});
+    }
+  }
   
   function toggleSearch() {
     isSearchOpen = !isSearchOpen;
