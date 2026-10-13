@@ -117,6 +117,7 @@ class LyricsView(VerticalScroll):
     }
     LyricsView .controls Button {
         margin: 0 1;
+        min-width: 12;
     }
     LyricsView .controls .playing {
         background: $success 30%;
@@ -130,6 +131,16 @@ class LyricsView(VerticalScroll):
         background: $error 30%;
         border: solid $error;
     }
+    LyricsView .shortcuts {
+        height: 1;
+        dock: bottom;
+        background: $panel;
+        border-top: solid $primary;
+        padding: 0 1;
+        color: $text-muted;
+        text-style: italic;
+        text-align: center;
+    }
     """
     
     BINDINGS = [
@@ -140,6 +151,7 @@ class LyricsView(VerticalScroll):
         Binding("home", "scroll_home", "Top"),
         Binding("end", "scroll_end", "Bottom"),
         Binding("space", "play_pause", "Play/Pause"),
+        Binding("ctrl+s", "play_pause", "Play/Pause"),
         Binding("s", "stop", "Stop"),
         Binding("t", "toggle_chords", "Chords"),
         Binding("]", "transpose_up", "Transpose +"),
@@ -167,6 +179,8 @@ class LyricsView(VerticalScroll):
             Label("", id="play-status"),
             classes="controls"
         )
+        shortcuts = "SPACE / Ctrl+S: Play/Pause  •  S: Stop  •  T: Chords  •  [ / ]: Transpose"
+        yield Label(shortcuts, classes="shortcuts")
 
     def set_song(self, song: Song) -> None:
         self.song = song
@@ -813,16 +827,23 @@ class MainScreen(Screen):
     ]
 
     def action_tab_lyrics(self) -> None:
-        self.query_one("#main-tabs", TabbedContent).active = "tab-lyrics"
+        tabs = self.query_one("#main-tabs", TabbedContent)
+        tabs.active = "tab-lyrics"
+        self.set_timer(0.05, lambda: self.query_one("#lyrics-view", LyricsView).focus())
 
     def action_tab_bpm(self) -> None:
-        self.query_one("#main-tabs", TabbedContent).active = "tab-bpm"
+        tabs = self.query_one("#main-tabs", TabbedContent)
+        tabs.active = "tab-bpm"
+        self.set_timer(0.05, lambda: self.query_one("#bpm-widget", BPMWidget).focus())
 
     def action_tab_settings(self) -> None:
-        self.query_one("#main-tabs", TabbedContent).active = "tab-settings"
+        tabs = self.query_one("#main-tabs", TabbedContent)
+        tabs.active = "tab-settings"
 
     def action_tab_web(self) -> None:
-        self.query_one("#main-tabs", TabbedContent).active = "tab-web"
+        tabs = self.query_one("#main-tabs", TabbedContent)
+        tabs.active = "tab-web"
+        self.set_timer(0.05, lambda: self.query_one("#web-view", WebView).focus())
 
     def action_tap_tempo(self) -> None:
         """Handle Space key for tap tempo on BPM tab."""
