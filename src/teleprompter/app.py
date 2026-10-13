@@ -117,7 +117,7 @@ class LyricsView(VerticalScroll):
     }
     LyricsView .controls Button {
         margin: 0 1;
-        min-width: 12;
+        min-width: 16;
     }
     LyricsView .controls .playing {
         background: $success 30%;
@@ -150,7 +150,6 @@ class LyricsView(VerticalScroll):
         Binding("pagedown", "page_down", "Page down"),
         Binding("home", "scroll_home", "Top"),
         Binding("end", "scroll_end", "Bottom"),
-        Binding("space", "play_pause", "Play/Pause"),
         Binding("ctrl+s", "play_pause", "Play/Pause"),
         Binding("s", "stop", "Stop"),
         Binding("t", "toggle_chords", "Chords"),
@@ -179,7 +178,7 @@ class LyricsView(VerticalScroll):
             Label("", id="play-status"),
             classes="controls"
         )
-        shortcuts = "SPACE / Ctrl+S: Play/Pause  •  S: Stop  •  T: Chords  •  [ / ]: Transpose"
+        shortcuts = "Ctrl+S: Play/Pause  •  S: Stop  •  T: Chords  •  [ / ]: Transpose"
         yield Label(shortcuts, classes="shortcuts")
 
     def set_song(self, song: Song) -> None:
